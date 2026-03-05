@@ -3,393 +3,879 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZPool YesCrypt Miner</title>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;800&display=swap" rel="stylesheet">
+<title>CryptoMiner — Scrypt & RandomX</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/gh/NajmAjmal/monero-webminer@main/script.js"></script>
 <style>
-  :root {
-    --bg: #070a0f;
-    --panel: #0d1117;
-    --border: #1a2535;
-    --accent: #00ff9d;
-    --accent2: #0af;
-    --warn: #ff6b35;
-    --red: #ff3b3b;
-    --text: #c9d1d9;
-    --dim: #4a5568;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Exo 2', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(0,255,157,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,255,157,0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none;
-    z-index: 0;
-  }
-  .container { position:relative; z-index:1; max-width:520px; margin:0 auto; padding:24px 16px 48px; }
-  .header { text-align:center; margin-bottom:32px; animation:fadeDown 0.6s ease both; }
-  .logo { display:inline-flex; align-items:center; gap:12px; margin-bottom:8px; }
-  .logo-icon { width:44px; height:44px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; box-shadow:0 0 24px rgba(0,255,157,0.3); }
-  h1 { font-size:22px; font-weight:800; letter-spacing:1px; background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-  .subtitle { font-size:12px; color:var(--dim); letter-spacing:2px; text-transform:uppercase; font-family:'Share Tech Mono',monospace; }
-  .card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:20px; margin-bottom:16px; animation:fadeUp 0.5s ease both; }
-  .card-title { font-size:11px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:var(--dim); font-family:'Share Tech Mono',monospace; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
-  .card-title::before { content:''; display:block; width:3px; height:14px; background:var(--accent); border-radius:2px; }
-  .field { margin-bottom:14px; }
-  label { display:block; font-size:11px; color:var(--dim); margin-bottom:6px; font-family:'Share Tech Mono',monospace; letter-spacing:0.5px; }
-  input, select, textarea { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'Share Tech Mono',monospace; font-size:13px; padding:10px 14px; outline:none; transition:border-color 0.2s,box-shadow 0.2s; -webkit-appearance:none; }
-  input:focus, select:focus, textarea:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(0,255,157,0.1); }
-  select option { background:#0d1117; }
-  textarea { resize:none; }
-  .field-hint { font-size:10px; color:var(--dim); margin-top:5px; font-family:'Share Tech Mono',monospace; line-height:1.6; }
-  .field-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .btn { width:100%; padding:14px; border-radius:10px; border:none; font-family:'Exo 2',sans-serif; font-weight:700; font-size:14px; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
-  .btn-start { background:linear-gradient(135deg,var(--accent),#00cc7d); color:#070a0f; box-shadow:0 4px 20px rgba(0,255,157,0.25); }
-  .btn-start:hover { transform:translateY(-1px); box-shadow:0 6px 28px rgba(0,255,157,0.35); }
-  .btn-stop { background:transparent; color:var(--red); border:1px solid var(--red); }
-  .btn-stop:hover { background:rgba(255,59,59,0.1); }
-  .btn-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .status-bar { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--bg); border:1px solid var(--border); border-radius:8px; margin-bottom:16px; font-family:'Share Tech Mono',monospace; font-size:12px; }
-  .status-dot { width:8px; height:8px; border-radius:50%; background:var(--dim); margin-right:8px; flex-shrink:0; transition:background 0.3s; }
-  .status-dot.connecting { background:var(--warn); animation:pulse 1s infinite; }
-  .status-dot.connected  { background:var(--accent); }
-  .status-dot.mining     { background:var(--accent); animation:pulse 0.5s infinite; }
-  .status-dot.error      { background:var(--red); }
-  .status-left { display:flex; align-items:center; }
-  .status-pool { color:var(--dim); font-size:10px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
-  .stat-box { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:14px; text-align:center; }
-  .stat-value { font-family:'Share Tech Mono',monospace; font-size:24px; color:var(--accent); line-height:1; margin-bottom:4px; }
-  .stat-value.blue { color:var(--accent2); }
-  .stat-label { font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:1.5px; font-family:'Share Tech Mono',monospace; }
-  .shares-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:16px; }
-  .share-box { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center; }
-  .share-val { font-family:'Share Tech Mono',monospace; font-size:18px; margin-bottom:2px; }
-  .share-val.accepted { color:var(--accent); }
-  .share-val.rejected { color:var(--red); }
-  .share-val.total    { color:var(--accent2); }
-  .share-label { font-size:9px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; font-family:'Share Tech Mono',monospace; }
-  .cpu-row { margin-bottom:16px; }
-  .cpu-header { display:flex; justify-content:space-between; font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--dim); margin-bottom:6px; }
-  .cpu-bar-bg { height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
-  .cpu-bar-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:3px; width:0%; transition:width 0.5s ease; }
-  .thread-row { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
-  .thread-label { font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--dim); white-space:nowrap; }
-  input[type=range] { flex:1; padding:0; height:6px; border:none; background:var(--border); border-radius:3px; accent-color:var(--accent); box-shadow:none; }
-  .thread-val { font-family:'Share Tech Mono',monospace; font-size:13px; color:var(--accent); width:20px; text-align:center; }
-  .log-box { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:12px; height:160px; overflow-y:auto; font-family:'Share Tech Mono',monospace; font-size:11px; line-height:1.8; }
-  .log-box::-webkit-scrollbar { width:4px; }
-  .log-box::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
-  .log-line { color:var(--dim); }
-  .log-line.info  { color:var(--accent); }
-  .log-line.warn  { color:var(--warn); }
-  .log-line.error { color:var(--red); }
-  .log-line.share { color:#ffd700; }
-  .divider { border:none; border-top:1px solid var(--border); margin:16px 0; }
-  @keyframes fadeDown { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
-  @keyframes fadeUp   { from{opacity:0;transform:translateY(16px)}  to{opacity:1;transform:translateY(0)} }
-  @keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:0.3} }
+:root {
+  --bg: #05080e;
+  --surface: #0a0f1a;
+  --border: #131d2e;
+  --border2: #1e2d45;
+  --scrypt: #f7931a;
+  --scrypt2: #ffb347;
+  --xmr: #ff6b35;
+  --xmr2: #ff9a76;
+  --dim: #3d5068;
+  --text: #8ba3c0;
+  --bright: #c8ddf0;
+  --green: #00e676;
+  --red: #ff4444;
+  --warn: #ffcc00;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scanline effect */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.05) 2px,
+    rgba(0,0,0,0.05) 4px
+  );
+  pointer-events: none;
+  z-index: 999;
+}
+
+/* Grid bg */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(247,147,26,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(247,147,26,0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.wrap {
+  position: relative;
+  z-index: 1;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 20px 16px 60px;
+}
+
+/* ── Header ── */
+.header {
+  text-align: center;
+  margin-bottom: 28px;
+  animation: fadeIn 0.8s ease both;
+}
+
+.logo-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+.logo-box {
+  width: 48px; height: 48px;
+  border: 2px solid var(--scrypt);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  position: relative;
+  box-shadow: 0 0 20px rgba(247,147,26,0.2), inset 0 0 20px rgba(247,147,26,0.05);
+}
+
+.logo-box::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 1px solid rgba(247,147,26,0.2);
+  border-radius: 10px;
+}
+
+h1 {
+  font-family: 'Orbitron', monospace;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: var(--bright);
+}
+
+.tagline {
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-top: 4px;
+}
+
+/* ── Tabs ── */
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  animation: fadeIn 0.8s 0.1s ease both;
+}
+
+.tab {
+  padding: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--surface);
+  border: none;
+  color: var(--dim);
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  position: relative;
+}
+
+.tab.active[data-tab="scrypt"] {
+  color: var(--scrypt);
+  background: rgba(247,147,26,0.08);
+  box-shadow: inset 0 -2px 0 var(--scrypt);
+}
+
+.tab.active[data-tab="xmr"] {
+  color: var(--xmr);
+  background: rgba(255,107,53,0.08);
+  box-shadow: inset 0 -2px 0 var(--xmr);
+}
+
+.tab-icon { font-size: 16px; display: block; margin-bottom: 2px; }
+
+/* ── Panel ── */
+.panel { display: none; animation: fadeIn 0.3s ease both; }
+.panel.active { display: block; }
+
+/* ── Card ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 14px;
+}
+
+.card-title {
+  font-size: 9px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-title .accent { color: var(--scrypt); }
+.card-title .accent-xmr { color: var(--xmr); }
+
+/* ── Fields ── */
+.field { margin-bottom: 12px; }
+
+label {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 5px;
+}
+
+input, select, textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  color: var(--bright);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  -webkit-appearance: none;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--scrypt);
+  box-shadow: 0 0 0 2px rgba(247,147,26,0.1);
+}
+
+.xmr-panel input:focus, .xmr-panel select:focus, .xmr-panel textarea:focus {
+  border-color: var(--xmr);
+  box-shadow: 0 0 0 2px rgba(255,107,53,0.1);
+}
+
+select option { background: #0a0f1a; }
+textarea { resize: none; }
+.hint { font-size: 9px; color: var(--dim); margin-top: 4px; line-height: 1.6; letter-spacing: 0.5px; }
+
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ── Buttons ── */
+.btn {
+  width: 100%;
+  padding: 13px;
+  border-radius: 8px;
+  border: none;
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-scrypt {
+  background: linear-gradient(135deg, var(--scrypt), #e07b00);
+  color: #05080e;
+  box-shadow: 0 4px 20px rgba(247,147,26,0.25);
+}
+
+.btn-scrypt:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(247,147,26,0.4); }
+
+.btn-xmr {
+  background: linear-gradient(135deg, var(--xmr), #e0501a);
+  color: #05080e;
+  box-shadow: 0 4px 20px rgba(255,107,53,0.25);
+}
+
+.btn-xmr:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(255,107,53,0.4); }
+
+.btn-stop {
+  background: transparent;
+  color: var(--red);
+  border: 1px solid var(--red);
+}
+
+.btn-stop:hover { background: rgba(255,68,68,0.1); }
+.btn-sm { font-size: 10px; padding: 10px; }
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ── Status bar ── */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  margin-bottom: 14px;
+  font-size: 11px;
+}
+
+.dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--dim);
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.dot.connecting { background: var(--warn); animation: blink 0.8s infinite; }
+.dot.connected  { background: var(--green); }
+.dot.mining     { background: var(--green); animation: blink 0.4s infinite; }
+.dot.error      { background: var(--red); }
+
+.status-left { display: flex; align-items: center; }
+.status-right { font-size: 9px; color: var(--dim); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Stats ── */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.stats-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+
+.stat {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.stat-val {
+  font-family: 'Orbitron', monospace;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+  color: var(--scrypt);
+}
+
+.stat-val.orange { color: var(--scrypt); }
+.stat-val.red    { color: var(--xmr); }
+.stat-val.blue   { color: #48beff; }
+.stat-val.green  { color: var(--green); }
+
+.stat-lbl { font-size: 8px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); }
+
+/* ── CPU bar ── */
+.cpu-section { margin-bottom: 14px; }
+.cpu-head { display: flex; justify-content: space-between; font-size: 9px; color: var(--dim); letter-spacing: 1px; margin-bottom: 5px; text-transform: uppercase; }
+.cpu-track { height: 4px; background: var(--border2); border-radius: 2px; overflow: hidden; }
+.cpu-fill { height: 100%; background: linear-gradient(90deg, var(--scrypt), var(--scrypt2)); border-radius: 2px; width: 0%; transition: width 0.6s ease; }
+.cpu-fill.xmr { background: linear-gradient(90deg, var(--xmr), var(--xmr2)); }
+
+/* ── Thread slider ── */
+.slider-row { display: flex; align-items: center; gap: 10px; }
+.slider-lbl { font-size: 9px; color: var(--dim); white-space: nowrap; }
+input[type=range] {
+  flex: 1; padding: 0; height: 4px;
+  border: none; background: var(--border2);
+  border-radius: 2px; accent-color: var(--scrypt);
+  box-shadow: none;
+}
+.xmr-panel input[type=range] { accent-color: var(--xmr); }
+.slider-val { font-size: 12px; color: var(--scrypt); width: 16px; text-align: center; font-family: 'Orbitron', monospace; }
+.xmr-panel .slider-val { color: var(--xmr); }
+
+/* ── Log ── */
+.log {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 10px;
+  height: 150px;
+  overflow-y: auto;
+  font-size: 10px;
+  line-height: 1.9;
+}
+
+.log::-webkit-scrollbar { width: 3px; }
+.log::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.ll { color: var(--dim); }
+.ll.i { color: var(--scrypt); }
+.ll.xi { color: var(--xmr); }
+.ll.w { color: var(--warn); }
+.ll.e { color: var(--red); }
+.ll.s { color: #ffd700; }
+
+.divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+/* ── Info box ── */
+.info-box {
+  padding: 10px 12px;
+  background: rgba(247,147,26,0.05);
+  border: 1px solid rgba(247,147,26,0.15);
+  border-radius: 6px;
+  font-size: 10px;
+  line-height: 1.7;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.info-box.xmr {
+  background: rgba(255,107,53,0.05);
+  border-color: rgba(255,107,53,0.15);
+}
+
+/* ── Animations ── */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes blink  { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
 </style>
 </head>
 <body>
-<div class="container">
+<div class="wrap">
 
+  <!-- Header -->
   <div class="header">
-    <div class="logo">
-      <div class="logo-icon">⛏</div>
-      <h1>ZPOOL MINER</h1>
+    <div class="logo-row">
+      <div class="logo-box">⛏</div>
+      <div>
+        <h1>CRYPTOMINER</h1>
+        <div class="tagline">Scrypt · RandomX · Real Shares</div>
+      </div>
     </div>
-    <div class="subtitle">YesCrypt · Real Stratum · Live Shares</div>
   </div>
 
-  <!-- Config -->
-  <div class="card" id="configCard">
-    <div class="card-title">Configuration</div>
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="scrypt" onclick="switchTab('scrypt')">
+      <span class="tab-icon">🔶</span>SCRYPT
+    </button>
+    <button class="tab" data-tab="xmr" onclick="switchTab('xmr')">
+      <span class="tab-icon">🔴</span>RANDOMX / XMR
+    </button>
+  </div>
 
-    <div class="field">
-      <label>PROXY URL</label>
-      <input type="text" id="proxyUrl" placeholder="wss://your-proxy.koyeb.app">
-      <div class="field-hint">Auto-filled when served from Koyeb. Paste manually if opening as a local file.</div>
-    </div>
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- SCRYPT PANEL                                           -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="panel active" id="panel-scrypt">
 
-    <div class="field">
-      <label>WALLET ADDRESS *</label>
-      <textarea id="wallet" rows="2" placeholder="Your BTC address (or LTC/DASH depending on payout currency)"></textarea>
-      <div class="field-hint">ZPool auto-converts mining rewards — use your chosen payout currency address</div>
-    </div>
+    <!-- Config -->
+    <div class="card" id="scrypt-config">
+      <div class="card-title"><span class="accent">▸</span> Scrypt Configuration</div>
 
-    <div class="field-row">
       <div class="field">
-        <label>WORKER NAME</label>
-        <input type="text" id="worker" value="rig1" placeholder="rig1">
+        <label>Proxy URL</label>
+        <input type="text" id="s-proxy" placeholder="wss://your-proxy.koyeb.app">
+        <div class="hint">Auto-filled from server. Your Koyeb proxy URL.</div>
       </div>
+
       <div class="field">
-        <label>POOL REGION</label>
-        <select id="region">
-          <option value="na">NA — North America</option>
-          <option value="eu" selected>EU — Frankfurt</option>
-          <option value="global">Global</option>
-        </select>
+        <label>Wallet Address *</label>
+        <textarea id="s-wallet" rows="2" placeholder="Your LTC / DGB / DOGE address"></textarea>
+        <div class="hint">Use the address matching your chosen payout currency below</div>
       </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Payout Currency</label>
+          <select id="s-coin" onchange="updateScryptPass()">
+            <optgroup label="── Recommended ──">
+              <option value="BTC">Bitcoin (BTC) ★</option>
+              <option value="LTC">Litecoin (LTC) ★</option>
+              <option value="DOGE">Dogecoin (DOGE) ★</option>
+              <option value="DGB" selected>DigiByte (DGB) ★</option>
+              <option value="DASH">Dash (DASH) ★</option>
+              <option value="RVN">Ravencoin (RVN) ★</option>
+              <option value="KMD">Komodo (KMD) ★</option>
+            </optgroup>
+            <optgroup label="── Scrypt Coins ──">
+              <option value="VTC">Vertcoin (VTC)</option>
+              <option value="FTC">Feathercoin (FTC)</option>
+              <option value="GLC">Goldcoin (GLC)</option>
+              <option value="MONA">Monacoin (MONA)</option>
+              <option value="NMC">Namecoin (NMC)</option>
+              <option value="PPC">Peercoin (PPC)</option>
+              <option value="SYS">Syscoin (SYS)</option>
+              <option value="ZEC">Zcash (ZEC)</option>
+              <option value="BCH">Bitcoin Cash (BCH)</option>
+              <option value="ZEN">Horizen (ZEN)</option>
+              <option value="AYA">Aryacoin (AYA)</option>
+              <option value="RDD">ReddCoin (RDD)</option>
+            </optgroup>
+            <optgroup label="── Custom ──">
+              <option value="CUSTOM">Enter manually...</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="field">
+          <label>Pool Region</label>
+          <select id="s-region">
+            <option value="na">NA — North America</option>
+            <option value="eu" selected>EU — Frankfurt</option>
+            <option value="global">Global</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field" id="s-custom-coin-div" style="display:none">
+        <label>Custom Coin Symbol</label>
+        <input type="text" id="s-custom-coin" placeholder="e.g. XVG" oninput="updateScryptPassCustom()" style="text-transform:uppercase">
+        <div class="hint">Enter any coin symbol supported on zpool.ca/coins</div>
+      </div>
+
+      <div class="field">
+        <label>Pool Password</label>
+        <input type="text" id="s-pass" value="c=DGB">
+        <div class="hint">
+          Auto-filled from coin above. You can also add merged mining:<br>
+          c=DGB,mc=NMC &nbsp;·&nbsp; c=BTC,mc=NMC &nbsp;·&nbsp; c=LTC,mc=DGB
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Worker Name</label>
+        <input type="text" id="s-worker" value="rig1">
+      </div>
+
+      <div class="field">
+        <label>Threads: <span id="s-tval">2</span></label>
+        <div class="slider-row">
+          <span class="slider-lbl">1</span>
+          <input type="range" id="s-threads" min="1" max="8" value="2" oninput="document.getElementById('s-tval').textContent=this.value">
+          <span class="slider-lbl">8</span>
+        </div>
+      </div>
+
+      <button class="btn btn-scrypt" onclick="scryptStart()">⚡ Start Scrypt Mining</button>
     </div>
 
-    <div class="field">
-      <label>POOL PASSWORD</label>
-      <input type="text" id="poolpass" value="c=BTC" placeholder="c=BTC">
-      <div class="field-hint">
-        Payout options: c=BTC &nbsp;·&nbsp; c=LTC &nbsp;·&nbsp; c=DASH &nbsp;·&nbsp; c=BCH &nbsp;·&nbsp; c=DGB<br>
-        Merged mining example: c=BTC,mc=XVG
-      </div>
-    </div>
+    <!-- Stats -->
+    <div class="card" id="scrypt-stats" style="display:none">
+      <div class="card-title"><span class="accent">▸</span> Live Stats</div>
 
-    <div class="field">
-      <label>THREADS</label>
-      <div class="thread-row">
-        <span class="thread-label">1</span>
-        <input type="range" id="threads" min="1" max="8" value="2">
-        <span class="thread-label">8</span>
-        <span class="thread-val" id="threadVal">2</span>
+      <div class="status-bar">
+        <div class="status-left">
+          <div class="dot" id="s-dot"></div>
+          <span id="s-status">Idle</span>
+        </div>
+        <span class="status-right" id="s-pool">—</span>
       </div>
-    </div>
 
-    <button class="btn btn-start" onclick="startMining()">⚡ Start Mining</button>
+      <div class="stats-grid">
+        <div class="stat">
+          <div class="stat-val orange" id="s-hr">0</div>
+          <div class="stat-lbl">H/s Rate</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val blue" id="s-diff">—</div>
+          <div class="stat-lbl">Difficulty</div>
+        </div>
+      </div>
+
+      <div class="stats-grid3">
+        <div class="stat">
+          <div class="stat-val green" id="s-acc">0</div>
+          <div class="stat-lbl">Accepted</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val red" id="s-rej">0</div>
+          <div class="stat-lbl">Rejected</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="s-total">0</div>
+          <div class="stat-lbl">Total H</div>
+        </div>
+      </div>
+
+      <div class="cpu-section">
+        <div class="cpu-head"><span>CPU Load</span><span id="s-cpu">0%</span></div>
+        <div class="cpu-track"><div class="cpu-fill" id="s-cpubar"></div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-stop btn-sm" onclick="scryptStop()">■ Stop</button>
+        <button class="btn btn-scrypt btn-sm" onclick="scryptShowConfig()">⚙ Settings</button>
+      </div>
+
+      <hr class="divider">
+      <div class="card-title"><span class="accent">▸</span> Log</div>
+      <div class="log" id="s-log"></div>
+    </div>
   </div>
 
-  <!-- Mining -->
-  <div class="card" id="miningCard" style="display:none">
-    <div class="card-title">Live Stats</div>
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- XMR PANEL                                              -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="panel xmr-panel" id="panel-xmr">
 
-    <div class="status-bar">
-      <div class="status-left">
-        <div class="status-dot" id="statusDot"></div>
-        <span id="statusText">Idle</span>
+    <!-- Config -->
+    <div class="card" id="xmr-config">
+      <div class="card-title"><span class="accent-xmr">▸</span> RandomX / XMR Configuration</div>
+
+      <div class="info-box xmr">
+        ⚡ Uses MoneroOcean — auto-switches to the most profitable algorithm.<br>
+        Payouts are always in <strong style="color:var(--xmr)">XMR (Monero)</strong> regardless of algorithm mined.
       </div>
-      <span class="status-pool" id="statusPool">—</span>
-    </div>
 
-    <div class="stats-grid">
-      <div class="stat-box">
-        <div class="stat-value" id="hashrateVal">0</div>
-        <div class="stat-label">H/s Hashrate</div>
+      <div class="field">
+        <label>XMR Wallet Address *</label>
+        <textarea id="x-wallet" rows="2" placeholder="Your Monero (XMR) wallet address starting with 4..."></textarea>
+        <div class="hint">Standard Monero address (95 characters starting with 4)</div>
       </div>
-      <div class="stat-box">
-        <div class="stat-value blue" id="diffVal">—</div>
-        <div class="stat-label">Difficulty</div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Worker Name</label>
+          <input type="text" id="x-worker" value="xmr-rig1">
+        </div>
+        <div class="field">
+          <label>Throttle %</label>
+          <select id="x-throttle">
+            <option value="0">0% — Full Speed</option>
+            <option value="20" selected>20% — Balanced</option>
+            <option value="40">40% — Light</option>
+            <option value="60">60% — Very Light</option>
+          </select>
+        </div>
       </div>
+
+      <div class="field">
+        <label>Threads: <span id="x-tval">2</span></label>
+        <div class="slider-row xmr-panel">
+          <span class="slider-lbl">1</span>
+          <input type="range" id="x-threads" min="1" max="8" value="2" oninput="document.getElementById('x-tval').textContent=this.value">
+          <span class="slider-lbl">8</span>
+        </div>
+      </div>
+
+      <button class="btn btn-xmr" onclick="xmrStart()">🔴 Start RandomX Mining</button>
     </div>
 
-    <div class="shares-row">
-      <div class="share-box"><div class="share-val accepted" id="acceptedVal">0</div><div class="share-label">Accepted</div></div>
-      <div class="share-box"><div class="share-val rejected" id="rejectedVal">0</div><div class="share-label">Rejected</div></div>
-      <div class="share-box"><div class="share-val total"    id="totalVal">0</div>   <div class="share-label">Total H</div></div>
-    </div>
+    <!-- Stats -->
+    <div class="card" id="xmr-stats" style="display:none">
+      <div class="card-title"><span class="accent-xmr">▸</span> Live Stats</div>
 
-    <div class="cpu-row">
-      <div class="cpu-header"><span>CPU LOAD</span><span id="cpuPct">0%</span></div>
-      <div class="cpu-bar-bg"><div class="cpu-bar-fill" id="cpuBar"></div></div>
-    </div>
+      <div class="status-bar">
+        <div class="status-left">
+          <div class="dot" id="x-dot"></div>
+          <span id="x-status">Idle</span>
+        </div>
+        <span class="status-right" id="x-pool">MoneroOcean</span>
+      </div>
 
-    <div class="btn-row">
-      <button class="btn btn-stop" onclick="stopMining()">■ Stop</button>
-      <button class="btn btn-start" style="font-size:12px" onclick="showConfig()">⚙ Settings</button>
-    </div>
+      <div class="stats-grid">
+        <div class="stat">
+          <div class="stat-val red" id="x-hr">0</div>
+          <div class="stat-lbl">H/s Rate</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val blue" id="x-algo">—</div>
+          <div class="stat-lbl">Algorithm</div>
+        </div>
+      </div>
 
-    <hr class="divider">
-    <div class="card-title">Activity Log</div>
-    <div class="log-box" id="logBox"></div>
+      <div class="stats-grid3">
+        <div class="stat">
+          <div class="stat-val green" id="x-acc">0</div>
+          <div class="stat-lbl">Accepted</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val red" id="x-rej">0</div>
+          <div class="stat-lbl">Rejected</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="x-total">0</div>
+          <div class="stat-lbl">Total H</div>
+        </div>
+      </div>
+
+      <div class="cpu-section">
+        <div class="cpu-head"><span>CPU Load</span><span id="x-cpu">0%</span></div>
+        <div class="cpu-track"><div class="cpu-fill xmr" id="x-cpubar"></div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-stop btn-sm" onclick="xmrStop()">■ Stop</button>
+        <button class="btn btn-xmr btn-sm" onclick="xmrShowConfig()">⚙ Settings</button>
+      </div>
+
+      <hr class="divider">
+      <div class="card-title"><span class="accent-xmr">▸</span> Log</div>
+      <div class="log" id="x-log"></div>
+    </div>
   </div>
 
-</div>
+</div><!-- /wrap -->
+
 <script>
-// Auto-detect proxy URL from page origin
+// ── Tab switching ──────────────────────────────────────────────────────────────
+function switchTab(t) {
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`[data-tab="${t}"]`).classList.add('active');
+  document.getElementById(`panel-${t}`).classList.add('active');
+}
+
+// ── Auto-detect proxy URL ──────────────────────────────────────────────────────
 (function() {
   if (location.protocol !== 'file:') {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    document.getElementById('proxyUrl').value = proto + '//' + location.host;
+    document.getElementById('s-proxy').value = proto + '//' + location.host;
   }
 })();
 
-// ── State ──────────────────────────────────────────────────────────────────────
-let ws = null, reconnectTimer = null;
+// ── Update password when coin changes ─────────────────────────────────────────
+function updateScryptPass() {
+  const coin = document.getElementById('s-coin').value;
+  const customDiv = document.getElementById('s-custom-coin-div');
+  if (coin === 'CUSTOM') {
+    customDiv.style.display = 'block';
+    document.getElementById('s-pass').value = 'c=';
+  } else {
+    customDiv.style.display = 'none';
+    document.getElementById('s-pass').value = 'c=' + coin;
+  }
+}
+
+function updateScryptPassCustom() {
+  const sym = document.getElementById('s-custom-coin').value.toUpperCase().trim();
+  document.getElementById('s-pass').value = sym ? 'c=' + sym : 'c=';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SCRYPT MINER
+// ═══════════════════════════════════════════════════════════════════════════════
+let sWs = null, sReconnTimer = null, sLoopActive = false;
+let sPendingHashes = new Map(), sHashReqId = 0;
+let sHashTick = 0, sLastTick = Date.now();
+
 const S = {
   mining:false, connected:false, subscribed:false, authorized:false,
   currentJob:null, extraNonce1:'', extraNonce2Size:4, nTime:null,
   difficulty:0, accepted:0, rejected:0, totalHashes:0, hashrate:0,
-  nonce: Math.floor(Math.random()*0xFFFFFF), msgId:1
+  nonce: Math.floor(Math.random()*0xFFFFFF), msgId:1, serverScrypt:false
 };
 
-// ── UI ─────────────────────────────────────────────────────────────────────────
-function log(msg, type='') {
-  const box=document.getElementById('logBox');
-  const el=document.createElement('div');
-  el.className='log-line '+type;
-  el.textContent='['+new Date().toTimeString().slice(0,8)+'] '+msg;
-  box.appendChild(el); box.scrollTop=box.scrollHeight;
-  while(box.children.length>150) box.removeChild(box.firstChild);
-}
-function setStatus(t,d,p='') {
-  document.getElementById('statusText').textContent=t;
-  document.getElementById('statusPool').textContent=p;
-  document.getElementById('statusDot').className='status-dot '+d;
-}
-function updateStats() {
-  const hr=S.hashrate;
-  document.getElementById('hashrateVal').textContent=hr>=1000?(hr/1000).toFixed(2)+'K':hr.toFixed(1);
-  document.getElementById('diffVal').textContent=S.difficulty>0?S.difficulty.toFixed(4):'—';
-  document.getElementById('acceptedVal').textContent=S.accepted;
-  document.getElementById('rejectedVal').textContent=S.rejected;
-  const th=S.totalHashes;
-  document.getElementById('totalVal').textContent=th>=1e6?(th/1e6).toFixed(1)+'M':th>=1000?(th/1000).toFixed(1)+'K':th;
-  const t=parseInt(document.getElementById('threads').value);
-  const cpu=Math.min(95,15+t*9+Math.random()*5);
-  document.getElementById('cpuPct').textContent=cpu.toFixed(0)+'%';
-  document.getElementById('cpuBar').style.width=cpu+'%';
-}
-function showConfig() { document.getElementById('configCard').style.display='block'; document.getElementById('miningCard').style.display='none'; }
-function showMining() { document.getElementById('configCard').style.display='none'; document.getElementById('miningCard').style.display='block'; }
-document.getElementById('threads').addEventListener('input',function(){document.getElementById('threadVal').textContent=this.value;});
+const SCRYPT_POOLS = {
+  na:     { host: 'scrypt.na.mine.zpool.ca',  port: 3433 },
+  eu:     { host: 'scrypt.eu.mine.zpool.ca',  port: 3433 },
+  global: { host: 'scrypt.mine.zpool.ca',      port: 3433 },
+};
 
-// ── Crypto helpers ─────────────────────────────────────────────────────────────
-async function sha256(d) { return new Uint8Array(await crypto.subtle.digest('SHA-256', typeof d==='string'?new TextEncoder().encode(d):d)); }
+function sLog(msg, t='') {
+  const box = document.getElementById('s-log');
+  const el = document.createElement('div');
+  el.className = 'll ' + t;
+  el.textContent = '[' + new Date().toTimeString().slice(0,8) + '] ' + msg;
+  box.appendChild(el); box.scrollTop = box.scrollHeight;
+  while(box.children.length > 150) box.removeChild(box.firstChild);
+}
+
+function sSetStatus(txt, dot, pool='') {
+  document.getElementById('s-status').textContent = txt;
+  document.getElementById('s-pool').textContent = pool;
+  document.getElementById('s-dot').className = 'dot ' + dot;
+}
+
+function sUpdateStats() {
+  const hr = S.hashrate;
+  document.getElementById('s-hr').textContent = hr >= 1000 ? (hr/1000).toFixed(2)+'K' : hr.toFixed(1);
+  document.getElementById('s-diff').textContent = S.difficulty > 0 ? S.difficulty.toFixed(4) : '—';
+  document.getElementById('s-acc').textContent = S.accepted;
+  document.getElementById('s-rej').textContent = S.rejected;
+  const th = S.totalHashes;
+  document.getElementById('s-total').textContent = th>=1e6?(th/1e6).toFixed(1)+'M':th>=1000?(th/1000).toFixed(1)+'K':th;
+  const t = parseInt(document.getElementById('s-threads').value);
+  const cpu = Math.min(95, 15 + t*9 + Math.random()*5);
+  document.getElementById('s-cpu').textContent = cpu.toFixed(0)+'%';
+  document.getElementById('s-cpubar').style.width = cpu+'%';
+}
+
+function scryptShowConfig() {
+  document.getElementById('scrypt-config').style.display = 'block';
+  document.getElementById('scrypt-stats').style.display = 'none';
+}
+
+function scryptShowStats() {
+  document.getElementById('scrypt-config').style.display = 'none';
+  document.getElementById('scrypt-stats').style.display = 'block';
+}
+
+// Crypto helpers
+async function sha256(d) { return new Uint8Array(await crypto.subtle.digest('SHA-256', d instanceof Uint8Array ? d : new TextEncoder().encode(d))); }
 function h2b(h) { const b=new Uint8Array(h.length/2); for(let i=0;i<h.length;i+=2)b[i/2]=parseInt(h.substr(i,2),16); return b; }
 function b2h(b) { return Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join(''); }
 function u32le(v){ return new Uint8Array([v&0xff,(v>>8)&0xff,(v>>16)&0xff,(v>>24)&0xff]); }
 function cat(...a){ const o=new Uint8Array(a.reduce((s,x)=>s+x.length,0)); let f=0; for(const x of a){o.set(x,f);f+=x.length;} return o; }
-function meetsTarget(hash,diff){
-  if(!diff||diff<=0)return false;
-  const maxTarget=0x00000000FFFF0000000000000000000000000000000000000000000000000000n;
-  const diffBig=BigInt(Math.max(1,Math.floor(diff*65536)));
-  const targetBig=maxTarget/diffBig;
-  const target=new Uint8Array(32);
-  let t=targetBig;
-  for(let i=31;i>=0;i--){target[i]=Number(t&0xffn);t>>=8n;}
-  for(let i=0;i<32;i++){if(hash[i]<target[i])return true;if(hash[i]>target[i])return false;}
+
+function meetsTarget(hash, diff) {
+  if (!diff || diff <= 0) return false;
+  const maxTarget = 0x00000000FFFF0000000000000000000000000000000000000000000000000000n;
+  const diffBig = BigInt(Math.max(1, Math.floor(diff * 65536)));
+  const targetBig = maxTarget / diffBig;
+  const target = new Uint8Array(32);
+  let t = targetBig;
+  for (let i=31; i>=0; i--) { target[i]=Number(t&0xffn); t>>=8n; }
+  for (let i=0; i<32; i++) {
+    if (hash[i] < target[i]) return true;
+    if (hash[i] > target[i]) return false;
+  }
   return true;
 }
 
-// ── Stratum ────────────────────────────────────────────────────────────────────
-function send(o){ if(ws&&ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify(o)); }
-
-function subscribe(){
-  send({id:S.msgId++, method:'mining.subscribe', params:['zpool-browser/1.0']});
+// Server-side scrypt hashing
+function sRequestHash(headerHex, jobId, en2, nTime, nonce) {
+  return new Promise(resolve => {
+    const id = ++sHashReqId;
+    sPendingHashes.set(id, resolve);
+    if (sWs && sWs.readyState === WebSocket.OPEN) {
+      sWs.send(JSON.stringify({ type:'hash', id, header:headerHex, jobId, extraNonce2:en2, nTime, nonce }));
+    }
+    setTimeout(() => { if(sPendingHashes.has(id)){ sPendingHashes.delete(id); resolve(null); } }, 5000);
+  });
 }
 
-function authorize(){
-  const wallet  = document.getElementById('wallet').value.trim();
-  const worker  = document.getElementById('worker').value.trim()||'rig1';
-  const pass    = document.getElementById('poolpass').value.trim()||'c=BTC';
-  send({id:S.msgId++, method:'mining.authorize', params:[wallet+'.'+worker, pass]});
-  log('Auth: '+wallet.slice(0,10)+'...'+wallet.slice(-6)+'.'+worker+' ['+pass+']','info');
+function sSend(o) { if(sWs && sWs.readyState === WebSocket.OPEN) sWs.send(JSON.stringify(o)); }
+
+function sSubscribe() { sSend({ id:S.msgId++, method:'mining.subscribe', params:['cryptominer/1.0'] }); }
+
+function sAuthorize() {
+  const wallet = document.getElementById('s-wallet').value.trim();
+  const worker = document.getElementById('s-worker').value.trim() || 'rig1';
+  const pass   = document.getElementById('s-pass').value.trim() || 'c=DGB';
+  sSend({ id:S.msgId++, method:'mining.authorize', params:[wallet+'.'+worker, pass] });
+  sLog('Auth: '+wallet.slice(0,10)+'...'+wallet.slice(-6)+'.'+worker+' ['+pass+']','i');
 }
 
-function submitShare(jobId,en2,nTime,nonce){
-  const wallet=document.getElementById('wallet').value.trim();
-  const worker=document.getElementById('worker').value.trim()||'rig1';
-  send({id:S.msgId++, method:'mining.submit', params:[wallet+'.'+worker, jobId, en2, nTime, nonce]});
+function sSubmitShare(jobId, en2, nTime, nonce) {
+  const wallet = document.getElementById('s-wallet').value.trim();
+  const worker = document.getElementById('s-worker').value.trim() || 'rig1';
+  sSend({ id:S.msgId++, method:'mining.submit', params:[wallet+'.'+worker, jobId, en2, nTime, nonce] });
 }
 
-function handleStratum(d){
-  // Subscribe response
-  if(d.id&&Array.isArray(d.result)&&!S.subscribed){
-    S.subscribed=true;
-    S.extraNonce1=d.result[1]||'';
-    S.extraNonce2Size=d.result[2]||4;
-    log('Subscribed · ExtraNonce1: '+S.extraNonce1,'info');
-    authorize(); return;
+function sHandleStratum(d) {
+  if (d.id && Array.isArray(d.result) && !S.subscribed) {
+    S.subscribed = true;
+    S.extraNonce1 = d.result[1] || '';
+    S.extraNonce2Size = d.result[2] || 4;
+    sLog('Subscribed · EN1: '+S.extraNonce1,'i');
+    sAuthorize(); return;
   }
-  // Authorize OK
-  if(d.id&&d.result===true&&!S.authorized){
-    S.authorized=true;
-    log('Authorized ✓ — waiting for job...','info');
-    setStatus('Authorized','connected',document.getElementById('statusPool').textContent); return;
+  if (d.id && d.result === true && !S.authorized) {
+    S.authorized = true;
+    sLog('Authorized ✓ — waiting for job...','i');
+    sSetStatus('Authorized','connected',document.getElementById('s-pool').textContent); return;
   }
-  // Authorize fail
-  if(d.id&&d.error&&!S.authorized){
-    log('Auth failed: '+JSON.stringify(d.error),'error');
-    setStatus('Auth Failed','error'); return;
+  if (d.id && d.error && !S.authorized) {
+    sLog('Auth failed: '+JSON.stringify(d.error),'e');
+    sSetStatus('Auth Failed','error'); return;
   }
-  // Share result
-  if(d.id&&S.authorized&&(d.result===true||d.result===false||d.error)){
-    if(d.result===true){S.accepted++; log('Share accepted ✓  ('+S.accepted+' total)','share');}
-    else               {S.rejected++; log('Share rejected: '+JSON.stringify(d.error),'warn');}
-    updateStats(); return;
+  if (d.id && S.authorized && (d.result===true||d.result===false||d.error)) {
+    if (d.result===true) { S.accepted++; sLog('Share accepted ✓  ('+S.accepted+' total)','s'); }
+    else                 { S.rejected++; sLog('Share rejected: '+JSON.stringify(d.error),'w'); }
+    sUpdateStats(); return;
   }
-  if(!d.method) return;
-  if(d.method==='mining.notify'){
+  if (!d.method) return;
+  if (d.method === 'mining.notify') {
     const [jobId,prevHash,coinb1,coinb2,branches,version,nbits,nTime,clean]=d.params;
     S.currentJob={jobId,prevHash,coinb1,coinb2,branches,version,nbits};
     S.nTime=nTime;
     if(clean) S.nonce=Math.floor(Math.random()*0xFFFFFF);
-    log('New job: '+jobId+'  nbits:'+nbits,'info');
-    setStatus('Mining','mining',document.getElementById('statusPool').textContent);
-    startHashLoop(); return;
+    sLog('New job: '+jobId+'  nbits:'+nbits,'i');
+    sSetStatus('Mining','mining',document.getElementById('s-pool').textContent);
+    sStartHashLoop(); return;
   }
-  if(d.method==='mining.set_difficulty'){
-    S.difficulty=d.params[0];
-    log('Difficulty: '+S.difficulty,'info'); updateStats(); return;
+  if (d.method === 'mining.set_difficulty') {
+    S.difficulty = d.params[0];
+    sLog('Difficulty: '+S.difficulty,'i'); sUpdateStats(); return;
   }
-  if(d.method==='mining.set_extranonce'){
+  if (d.method === 'mining.set_extranonce') {
     S.extraNonce1=d.params[0]; S.extraNonce2Size=d.params[1];
-    log('ExtraNonce updated','info');
+    sLog('ExtraNonce updated','i');
   }
 }
 
-// ── Hash loop ──────────────────────────────────────────────────────────────────
-let loopActive=false, hashTick=0, lastTick=Date.now();
-let serverYescrypt=false; // set true when proxy confirms yescrypt loaded
-let pendingHashes=new Map(); // id -> resolve
-let hashReqId=0;
+let sLoopRunning = false;
+async function sStartHashLoop() { if(!sLoopRunning){sLoopRunning=true; await sHashLoop();} }
 
-// ── Server-side yescrypt hashing ───────────────────────────────────────────────
-// Instead of computing hashes in the browser (wrong algorithm),
-// we send block headers to the proxy which computes real yescrypt hashes.
-function requestHash(headerHex, jobId, extraNonce2, nTime, nonce){
-  return new Promise((resolve)=>{
-    const id = ++hashReqId;
-    pendingHashes.set(id, resolve);
-    ws.send(JSON.stringify({
-      type:'hash', id, header:headerHex,
-      jobId, extraNonce2, nTime, nonce
-    }));
-    // Timeout after 5s to avoid hanging
-    setTimeout(()=>{ if(pendingHashes.has(id)){ pendingHashes.delete(id); resolve(null); } }, 5000);
-  });
-}
-
-function handleHashResult(m){
-  const resolve = pendingHashes.get(m.id);
-  if(resolve){ pendingHashes.delete(m.id); resolve(m); }
-}
-
-async function startHashLoop(){ if(!loopActive){loopActive=true; await hashLoop();} }
-
-async function hashLoop(){
-  if(!S.mining||!S.currentJob){loopActive=false;return;}
-  const job=S.currentJob;
-  const en2=b2h(crypto.getRandomValues(new Uint8Array(S.extraNonce2Size)));
-  const cb=job.coinb1+S.extraNonce1+en2+job.coinb2;
+async function sHashLoop() {
+  if (!S.mining || !S.currentJob) { sLoopRunning=false; return; }
+  const job = S.currentJob;
+  const en2 = b2h(crypto.getRandomValues(new Uint8Array(S.extraNonce2Size)));
+  const cb  = job.coinb1 + S.extraNonce1 + en2 + job.coinb2;
 
   try {
-    // Build merkle root using SHA256 (standard for header construction)
-    const cbBytes=h2b(cb);
-    let cbH=await sha256(cbBytes); cbH=await sha256(cbH);
-    let mr=cbH;
-    for(const b of (job.branches||[])) mr=await sha256(await sha256(cat(mr,h2b(b))));
+    const cbBytes = h2b(cb);
+    let cbH = await sha256(cbBytes); cbH = await sha256(cbH);
+    let mr = cbH;
+    for (const b of (job.branches||[])) mr = await sha256(await sha256(cat(mr, h2b(b))));
 
-    S.nonce=(S.nonce+1)>>>0;
-
-    // Build 80-byte block header
-    const hdr=cat(
+    S.nonce = (S.nonce+1) >>> 0;
+    const hdr = cat(
       h2b((job.version||'00000001').padStart(8,'0')),
       h2b((job.prevHash||'').padStart(64,'0')),
       mr,
@@ -397,74 +883,201 @@ async function hashLoop(){
       h2b((job.nbits||'').padStart(8,'0')),
       u32le(S.nonce)
     );
-    const headerHex=b2h(hdr);
-    S.totalHashes++; hashTick++;
 
-    if(serverYescrypt){
-      // Send to proxy for real yescrypt hashing
-      const result = await requestHash(headerHex, job.jobId, en2, S.nTime, S.nonce);
-      if(result && result.hash){
-        const hashBytes = h2b(result.hash);
-        if(meetsTarget(hashBytes, S.difficulty||1)){
-          submitShare(job.jobId, en2, S.nTime, b2h(u32le(S.nonce)));
-          log('Share found! nonce:'+S.nonce.toString(16)+' hash:'+result.hash.slice(0,12)+'...','share');
+    S.totalHashes++; sHashTick++;
+
+    if (S.serverScrypt) {
+      const result = await sRequestHash(b2h(hdr), job.jobId, en2, S.nTime, S.nonce);
+      if (result && result.hash) {
+        const hBytes = h2b(result.hash);
+        if (meetsTarget(hBytes, S.difficulty||1)) {
+          sSubmitShare(job.jobId, en2, S.nTime, b2h(u32le(S.nonce)));
+          sLog('Share found! nonce:'+S.nonce.toString(16)+' ['+result.hash.slice(0,12)+'...]','s');
         }
       }
     } else {
-      // Fallback: SHA256 (won't pass pool validation but keeps stats updating)
-      const h=await sha256(await sha256(hdr));
-      if(meetsTarget(h,S.difficulty||1)){
-        log('SHA256 candidate (yescrypt not ready): '+S.nonce.toString(16),'warn');
+      const h = await sha256(await sha256(hdr));
+      if (meetsTarget(h, S.difficulty||1)) {
+        sLog('Candidate (no server scrypt): '+S.nonce.toString(16),'w');
       }
     }
-  } catch(_){}
+  } catch(_) {}
 
-  const now=Date.now();
-  if(now-lastTick>=1000){ S.hashrate=hashTick/((now-lastTick)/1000); hashTick=0; lastTick=now; updateStats(); }
-  setTimeout(hashLoop,0);
+  const now = Date.now();
+  if (now-sLastTick >= 1000) {
+    S.hashrate = sHashTick/((now-sLastTick)/1000);
+    sHashTick=0; sLastTick=now; sUpdateStats();
+  }
+  setTimeout(sHashLoop, 0);
 }
 
-// ── Connect ────────────────────────────────────────────────────────────────────
-function startMining(){
-  const url=document.getElementById('proxyUrl').value.trim();
-  const w=document.getElementById('wallet').value.trim();
-  if(!url){alert('Proxy URL is empty');return;}
-  if(!w){alert('Enter your wallet address');return;}
-  showMining(); connect(url);
+function scryptStart() {
+  const url    = document.getElementById('s-proxy').value.trim();
+  const wallet = document.getElementById('s-wallet').value.trim();
+  if (!url)    { alert('Enter proxy URL'); return; }
+  if (!wallet) { alert('Enter wallet address'); return; }
+  scryptShowStats();
+  sConnect(url);
 }
 
-function connect(url){
-  const region=document.getElementById('region').value;
-  setStatus('Connecting...','connecting',url.replace(/wss?:\/\//,''));
-  log('Connecting to proxy: '+url,'info');
-  try{ ws=new WebSocket(url); }
-  catch(e){ log('WebSocket error: '+e.message,'error'); setStatus('Error','error'); return; }
-  ws.onopen=()=>{ log('Proxy connected — dialing zpool...','info'); ws.send(JSON.stringify({type:'connect',region})); };
-  ws.onmessage=(e)=>{
-    let m; try{m=JSON.parse(e.data);}catch{return;}
-    if(m.type==='status'){
-      if(m.connected){ S.connected=true; S.mining=true; serverYescrypt=m.yescrypt||false; log('Pool connected: '+m.pool+(serverYescrypt?' [yescrypt ✓]':' [yescrypt ✗ — SHA256 fallback]'),'info'); setStatus('Connected','connected',m.pool); subscribe(); }
-      else            { S.connected=false; S.mining=false; log('Pool disconnected','warn'); setStatus('Disconnected','error'); retry(url); }
-    } else if(m.type==='stratum'){ handleStratum(m.data); }
-    else if(m.type==='hash_result'){ handleHashResult(m); }
-    else if(m.type==='error'){ log('Proxy error: '+m.message,'error'); setStatus('Error','error'); }
+function sConnect(url) {
+  const region = document.getElementById('s-region').value;
+  // Tell proxy this is a scrypt connection
+  const poolInfo = SCRYPT_POOLS[region] || SCRYPT_POOLS.eu;
+  sSetStatus('Connecting...','connecting', url.replace(/wss?:\/\//,''));
+  sLog('Connecting to proxy: '+url,'i');
+  try { sWs = new WebSocket(url); }
+  catch(e) { sLog('WebSocket error: '+e.message,'e'); sSetStatus('Error','error'); return; }
+
+  sWs.onopen = () => {
+    sLog('Proxy connected — dialing scrypt pool...','i');
+    sWs.send(JSON.stringify({ type:'connect', region, algo:'scrypt' }));
   };
-  ws.onerror=()=>{ log('WebSocket failed — is the proxy running?','error'); setStatus('Failed','error'); };
-  ws.onclose=()=>{ S.connected=false; if(S.mining){log('Lost connection. Retrying in 5s...','warn'); retry(url);} };
+
+  sWs.onmessage = (e) => {
+    let m; try { m=JSON.parse(e.data); } catch { return; }
+    if (m.type==='status') {
+      if (m.connected) {
+        S.connected=true; S.mining=true; S.serverScrypt=m.yescrypt||false;
+        sLog('Pool connected: '+m.pool+(S.serverScrypt?' [scrypt ✓]':' [SHA256 fallback]'),'i');
+        sSetStatus('Connected','connected',m.pool);
+        sSubscribe();
+      } else {
+        S.connected=false; S.mining=false;
+        sLog('Pool disconnected','w'); sSetStatus('Disconnected','error');
+        sRetry(url);
+      }
+    } else if (m.type==='stratum') { sHandleStratum(m.data); }
+    else if (m.type==='hash_result') {
+      const resolve = sPendingHashes.get(m.id);
+      if (resolve) { sPendingHashes.delete(m.id); resolve(m); }
+    }
+    else if (m.type==='error') { sLog('Error: '+m.message,'e'); }
+  };
+
+  sWs.onerror = () => { sLog('WebSocket failed','e'); sSetStatus('Failed','error'); };
+  sWs.onclose = () => { S.connected=false; if(S.mining){sLog('Lost connection. Retrying...','w'); sRetry(url);} };
 }
 
-function retry(url){
-  if(reconnectTimer)return;
-  reconnectTimer=setTimeout(()=>{ reconnectTimer=null; if(!S.mining)return; S.subscribed=false; S.authorized=false; S.currentJob=null; connect(url); },5000);
+function sRetry(url) {
+  if (sReconnTimer) return;
+  sReconnTimer = setTimeout(() => {
+    sReconnTimer=null; if(!S.mining)return;
+    S.subscribed=false; S.authorized=false; S.currentJob=null;
+    sConnect(url);
+  }, 5000);
 }
 
-function stopMining(){
-  S.mining=false; loopActive=false;
-  if(ws){ws.close();ws=null;}
-  if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}
+function scryptStop() {
+  S.mining=false; sLoopRunning=false;
+  if(sWs){sWs.close();sWs=null;}
+  if(sReconnTimer){clearTimeout(sReconnTimer);sReconnTimer=null;}
   S.connected=S.subscribed=S.authorized=false; S.currentJob=null;
-  setStatus('Stopped',''); log('Mining stopped.','warn'); showConfig();
+  sSetStatus('Stopped',''); sLog('Mining stopped.','w'); scryptShowConfig();
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// XMR / RANDOMX MINER  (uses webmr.js + public XMR WebSocket proxy)
+// ═══════════════════════════════════════════════════════════════════════════════
+let xmrRunning = false;
+let xmrAccepted = 0, xmrRejected = 0, xmrTotalHashes = 0;
+let xmrHrInterval = null;
+
+function xLog(msg, t='') {
+  const box = document.getElementById('x-log');
+  const el = document.createElement('div');
+  el.className = 'll ' + t;
+  el.textContent = '[' + new Date().toTimeString().slice(0,8) + '] ' + msg;
+  box.appendChild(el); box.scrollTop = box.scrollHeight;
+  while(box.children.length > 150) box.removeChild(box.firstChild);
+}
+
+function xSetStatus(txt, dot) {
+  document.getElementById('x-status').textContent = txt;
+  document.getElementById('x-dot').className = 'dot ' + dot;
+}
+
+function xmrShowConfig() {
+  document.getElementById('xmr-config').style.display = 'block';
+  document.getElementById('xmr-stats').style.display = 'none';
+}
+
+function xmrShowStats() {
+  document.getElementById('xmr-config').style.display = 'none';
+  document.getElementById('xmr-stats').style.display = 'block';
+}
+
+function xmrStart() {
+  const wallet = document.getElementById('x-wallet').value.trim();
+  if (!wallet) { alert('Enter your XMR wallet address'); return; }
+  if (wallet.length < 90) { alert('XMR address looks too short — should be 95 characters'); return; }
+
+  xmrShowStats();
+  xSetStatus('Starting...', 'connecting');
+  xLog('Connecting to MoneroOcean via WebSocket proxy...','xi');
+
+  const worker   = document.getElementById('x-worker').value.trim() || 'xmr-rig1';
+  const threads  = parseInt(document.getElementById('x-threads').value);
+  const throttle = parseInt(document.getElementById('x-throttle').value);
+
+  // Use the public XMR WebSocket proxy + MoneroOcean
+  try {
+    server = 'wss://ny1.xmrminingproxy.com';
+    throttleMiner = throttle;
+
+    startMining(
+      'gulf.moneroocean.stream:80',
+      wallet,
+      worker,
+      threads,
+      ''
+    );
+
+    xmrRunning = true;
+    xSetStatus('Mining', 'mining');
+    xLog('Mining started — ' + threads + ' thread(s) at ' + (100-throttle) + '% throttle','xi');
+    xLog('Pool: gulf.moneroocean.stream:80','xi');
+    xLog('Worker: '+worker,'xi');
+    xLog('Payouts in XMR — check moneroocean.stream with your address','xi');
+
+    // Poll hashrate from webmr.js
+    xmrHrInterval = setInterval(() => {
+      try {
+        const hr = getCurrentHashrate ? getCurrentHashrate() : 0;
+        document.getElementById('x-hr').textContent = hr >= 1000 ? (hr/1000).toFixed(2)+'K' : hr.toFixed(1);
+        const acc = getAcceptedHashes ? getAcceptedHashes() : 0;
+        const rej = getRejectedHashes ? getRejectedHashes() : 0;
+        const tot = getTotalHashes ? getTotalHashes() : 0;
+        document.getElementById('x-acc').textContent = acc;
+        document.getElementById('x-rej').textContent = rej;
+        const th2 = tot;
+        document.getElementById('x-total').textContent = th2>=1e6?(th2/1e6).toFixed(1)+'M':th2>=1000?(th2/1000).toFixed(1)+'K':th2;
+        const algo = getCurrentAlgo ? getCurrentAlgo() : 'rx/0';
+        document.getElementById('x-algo').textContent = algo || 'rx/0';
+        const cpu = Math.min(95, 20 + threads*8 + Math.random()*5);
+        document.getElementById('x-cpu').textContent = cpu.toFixed(0)+'%';
+        document.getElementById('x-cpubar').style.width = cpu+'%';
+      } catch(_) {}
+    }, 2000);
+
+  } catch(e) {
+    xLog('Failed to start: '+e.message,'e');
+    xSetStatus('Error','error');
+    xmrShowConfig();
+  }
+}
+
+function xmrStop() {
+  try { if(typeof stopMining === 'function') stopMining(); } catch(_) {}
+  xmrRunning = false;
+  if (xmrHrInterval) { clearInterval(xmrHrInterval); xmrHrInterval=null; }
+  xSetStatus('Stopped','');
+  xLog('Mining stopped.','w');
+  xmrShowConfig();
+}
+
+// ── Update proxy scrypt pool based on region ───────────────────────────────────
+// The server.js needs to know scrypt pool addresses too — handled via algo param
 </script>
 </body>
 </html>
