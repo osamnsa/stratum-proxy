@@ -9,54 +9,56 @@ const { promisify } = require('util');
 const scrypt = promisify(crypto.scrypt);
 const PORT = process.env.PORT || 8080;
 
+// ── Pool endpoints ─────────────────────────────────────────────────────────────
 const POOLS = {
-  na:     { host: 'yescrypt.na.mine.zpool.ca',  port: 6233 },
-  eu:     { host: 'yescrypt.eu.mine.zpool.ca',  port: 6233 },
-  global: { host: 'yescrypt.mine.zpool.ca',      port: 6233 },
+  yescrypt: {
+    na:     { host: 'yescrypt.na.mine.zpool.ca',  port: 6233 },
+    eu:     { host: 'yescrypt.eu.mine.zpool.ca',  port: 6233 },
+    global: { host: 'yescrypt.mine.zpool.ca',      port: 6233 },
+  },
+  scrypt: {
+    na:     { host: 'scrypt.na.mine.zpool.ca',    port: 3433 },
+    eu:     { host: 'scrypt.eu.mine.zpool.ca',    port: 3433 },
+    global: { host: 'scrypt.mine.zpool.ca',        port: 3433 },
+  },
 };
 
-// ─── Yescrypt-compatible hash using Node.js built-in scrypt ──────────────────
-// ZPool yescrypt uses N=2048, r=8, p=1, dkLen=32
-// Node's crypto.scrypt is compatible with the scrypt KDF underlying yescrypt
-async function computeYescrypt(headerHex) {
+// ── Hashing ────────────────────────────────────────────────────────────────────
+// Node.js crypto.scrypt is compatible with both yescrypt and scrypt KDF
+// ZPool params: N=2048, r=8, p=1 for yescrypt; N=1024, r=1, p=1 for scrypt
+async function computeHash(headerHex, algo) {
   try {
     const input = Buffer.from(headerHex, 'hex');
-    // scrypt(password, salt, keylen, options)
-    // For yescrypt mining: password = salt = block header
-    // N=2048, r=8, p=1 (zpool yescrypt parameters)
-    const hash = await scrypt(input, input, 32, { N: 2048, r: 8, p: 1 });
+    const opts = algo === 'scrypt'
+      ? { N: 1024, r: 1, p: 1 }
+      : { N: 2048, r: 8, p: 1 };
+    const hash = await scrypt(input, input, 32, opts);
     return hash.toString('hex');
   } catch (e) {
-    console.error('[!] scrypt hash error:', e.message);
+    console.error('[!] Hash error:', e.message);
     return null;
   }
 }
 
-console.log('[✓] Node.js built-in scrypt ready — yescrypt-compatible hashing enabled');
+console.log('[✓] Node.js built-in scrypt ready (yescrypt + scrypt compatible)');
 
-// ─── HTTP server ──────────────────────────────────────────────────────────────
+// ── HTTP server ────────────────────────────────────────────────────────────────
 const httpServer = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-
   if (req.method === 'GET' && (req.url === '/' || req.url === '/miner.html')) {
     const filePath = path.join(__dirname, 'miner.html');
     fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('miner.html not found');
-        return;
-      }
+      if (err) { res.writeHead(404); res.end('Not found'); return; }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(data);
     });
     return;
   }
-
   res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ status: 'ok', hashing: 'scrypt-yescrypt-compatible' }));
+  res.end(JSON.stringify({ status: 'ok', algos: ['yescrypt','scrypt'] }));
 });
 
-// ─── WebSocket server ─────────────────────────────────────────────────────────
+// ── WebSocket server ───────────────────────────────────────────────────────────
 const wss = new WebSocket.Server({ server: httpServer });
 
 wss.on('connection', (ws, req) => {
@@ -66,6 +68,7 @@ wss.on('connection', (ws, req) => {
   let tcpSocket = null;
   let buffer = '';
   let isAlive = true;
+  let currentAlgo = 'scrypt';
 
   const heartbeat = setInterval(() => {
     if (!isAlive) { ws.terminate(); return; }
@@ -79,19 +82,22 @@ wss.on('connection', (ws, req) => {
     let msg;
     try { msg = JSON.parse(raw); } catch (e) { return; }
 
-    // Connect to pool
+    // Connect command
     if (msg.type === 'connect') {
-      const pool = POOLS[msg.region] || POOLS.eu;
-      console.log(`[>] Connecting to pool ${pool.host}:${pool.port}`);
-      tcpSocket = new net.Socket();
+      currentAlgo = msg.algo || 'scrypt';
+      const poolSet = POOLS[currentAlgo] || POOLS.scrypt;
+      const pool = poolSet[msg.region] || poolSet.eu;
+      console.log(`[>] ${currentAlgo.toUpperCase()} → ${pool.host}:${pool.port}`);
 
+      tcpSocket = new net.Socket();
       tcpSocket.connect(pool.port, pool.host, () => {
         console.log(`[✓] Pool connected: ${pool.host}:${pool.port}`);
         ws.send(JSON.stringify({
           type: 'status',
           connected: true,
           pool: `${pool.host}:${pool.port}`,
-          yescrypt: true  // scrypt is always available in Node.js
+          yescrypt: true,
+          algo: currentAlgo
         }));
       });
 
@@ -101,25 +107,24 @@ wss.on('connection', (ws, req) => {
         buffer = lines.pop();
         lines.forEach(line => {
           if (!line.trim()) return;
-          try {
-            ws.send(JSON.stringify({ type: 'stratum', data: JSON.parse(line) }));
-          } catch (e) {}
+          try { ws.send(JSON.stringify({ type:'stratum', data:JSON.parse(line) })); }
+          catch (e) {}
         });
       });
 
       tcpSocket.on('error', (err) => {
-        ws.send(JSON.stringify({ type: 'error', message: err.message }));
+        ws.send(JSON.stringify({ type:'error', message:err.message }));
       });
 
       tcpSocket.on('close', () => {
-        ws.send(JSON.stringify({ type: 'status', connected: false }));
+        ws.send(JSON.stringify({ type:'status', connected:false }));
       });
       return;
     }
 
-    // Hash request — compute real scrypt hash on server
+    // Hash request
     if (msg.type === 'hash') {
-      const hashHex = await computeYescrypt(msg.header);
+      const hashHex = await computeHash(msg.header, currentAlgo);
       ws.send(JSON.stringify({
         type: 'hash_result',
         id: msg.id,
@@ -132,7 +137,7 @@ wss.on('connection', (ws, req) => {
       return;
     }
 
-    // Forward stratum messages to pool
+    // Forward to pool
     if (tcpSocket && tcpSocket.writable) {
       tcpSocket.write(JSON.stringify(msg) + '\n');
     }
@@ -151,8 +156,7 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// ─── Start ────────────────────────────────────────────────────────────────────
+// ── Start ──────────────────────────────────────────────────────────────────────
 httpServer.listen(PORT, () => {
-  console.log(`[Proxy] HTTP + WebSocket server running on port ${PORT}`);
-  console.log(`[Proxy] Ready — visit your Koyeb URL to open the miner`);
+  console.log(`[Proxy] Running on port ${PORT} — Scrypt + YesCrypt + WebSocket proxy`);
 });
