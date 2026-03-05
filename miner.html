@@ -265,7 +265,17 @@ function h2b(h) { const b=new Uint8Array(h.length/2); for(let i=0;i<h.length;i+=
 function b2h(b) { return Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join(''); }
 function u32le(v){ return new Uint8Array([v&0xff,(v>>8)&0xff,(v>>16)&0xff,(v>>24)&0xff]); }
 function cat(...a){ const o=new Uint8Array(a.reduce((s,x)=>s+x.length,0)); let f=0; for(const x of a){o.set(x,f);f+=x.length;} return o; }
-function meetsTarget(hash,diff){ const z=Math.max(0,Math.floor(Math.log2(diff)/4)); for(let i=0;i<z&&i<32;i++)if(hash[i]!==0)return false; return true; }
+function meetsTarget(hash,diff){
+  if(!diff||diff<=0)return false;
+  const maxTarget=0x00000000FFFF0000000000000000000000000000000000000000000000000000n;
+  const diffBig=BigInt(Math.max(1,Math.floor(diff*65536)));
+  const targetBig=maxTarget/diffBig;
+  const target=new Uint8Array(32);
+  let t=targetBig;
+  for(let i=31;i>=0;i--){target[i]=Number(t&0xffn);t>>=8n;}
+  for(let i=0;i<32;i++){if(hash[i]<target[i])return true;if(hash[i]>target[i])return false;}
+  return true;
+}
 
 // ── Stratum ────────────────────────────────────────────────────────────────────
 function send(o){ if(ws&&ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify(o)); }
