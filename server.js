@@ -3,6 +3,7 @@ const WebSocket = require('ws');
 const net = require('net');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const PORT = process.env.PORT || 8080;
 
@@ -12,38 +13,59 @@ const POOLS = {
   global: { host: 'yescrypt.mine.zpool.ca',      port: 6233 },
 };
 
-// Load yescrypt WASM for real hashing
-let yescrypt = null;
+// ─── yescrypt hashing ─────────────────────────────────────────────────────────
+let yescryptHash = null;
+
 async function loadYescrypt() {
-  try {
-    const mod = await import('yescrypt-wasm');
-    yescrypt = mod.default || mod;
-    console.log('[✓] yescrypt-wasm loaded — real hashing enabled');
-  } catch (e) {
-    console.warn('[!] yescrypt-wasm not available:', e.message);
-    console.warn('[!] Falling back to SHA256 (shares will be rejected by pool)');
+  const attempts = [
+    // Try ESM dynamic import
+    async () => {
+      const mod = await import('yescrypt-wasm');
+      return mod.yescrypt || mod.hash || mod.default?.yescrypt || mod.default?.hash || mod.default;
+    },
+    // Try require
+    async () => {
+      const mod = require('yescrypt-wasm');
+      return mod.yescrypt || mod.hash || mod.default?.yescrypt || mod.default?.hash || mod.default;
+    },
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const fn = await attempt();
+      if (typeof fn === 'function') {
+        // Test it works
+        const testInput = Buffer.alloc(80);
+        await fn(testInput, testInput, 2048, 8, 1, 32);
+        yescryptHash = fn;
+        console.log('[✓] yescrypt-wasm loaded and tested — real hashing enabled');
+        return;
+      } else {
+        console.log('[!] yescrypt-wasm loaded but no callable function found, type:', typeof fn);
+      }
+    } catch (e) {
+      console.log('[!] yescrypt load attempt failed:', e.message);
+    }
   }
+  console.warn('[!] yescrypt-wasm unavailable — proxy will relay stratum only');
+  console.warn('[!] Shares will be computed browser-side with SHA256 (rejected by pool)');
 }
 
-// Compute real yescrypt hash of a block header
-// ZPool yescrypt uses: N=2048, r=8, p=1
 async function computeYescrypt(headerHex) {
-  if (!yescrypt) return null;
+  if (!yescryptHash) return null;
   try {
     const input = Buffer.from(headerHex, 'hex');
-    // yescrypt-wasm: hash(password, salt, N, r, p, dkLen)
-    // For mining, password = salt = block header
-    const result = await yescrypt.hash(input, input, 2048, 8, 1, 32);
-    return Buffer.from(result).toString('hex');
+    const result = await yescryptHash(input, input, 2048, 8, 1, 32);
+    // Reverse bytes for display (little-endian to big-endian)
+    return Buffer.from(result).reverse().toString('hex');
   } catch (e) {
-    console.error('[!] yescrypt hash error:', e.message);
+    console.error('[!] yescrypt compute error:', e.message);
     return null;
   }
 }
 
-// ─── HTTP server — serves miner.html ─────────────────────────────────────────
+// ─── HTTP server ──────────────────────────────────────────────────────────────
 const httpServer = http.createServer((req, res) => {
-  // CORS headers for WebSocket upgrade
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   if (req.method === 'GET' && (req.url === '/' || req.url === '/miner.html')) {
@@ -60,11 +82,10 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
-  // Health check endpoint
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({
     status: 'ok',
-    yescrypt: yescrypt !== null,
+    yescrypt: yescryptHash !== null,
     pools: Object.keys(POOLS)
   }));
 });
@@ -74,14 +95,12 @@ const wss = new WebSocket.Server({ server: httpServer });
 
 wss.on('connection', (ws, req) => {
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  console.log(`[+] Miner connected: ${ip}`);
+  console.log(`[+] Miner connected from ${ip}`);
 
   let tcpSocket = null;
   let buffer = '';
   let isAlive = true;
-
-  // Track pending message IDs to know which are share submissions
-  const pendingShares = new Map(); // msgId -> {jobId, nonce, ...}
+  const pendingHashes = new Map();
 
   const heartbeat = setInterval(() => {
     if (!isAlive) { ws.terminate(); return; }
@@ -95,11 +114,10 @@ wss.on('connection', (ws, req) => {
     let msg;
     try { msg = JSON.parse(raw); } catch (e) { return; }
 
-    // Connect to pool command
+    // Connect to pool
     if (msg.type === 'connect') {
       const pool = POOLS[msg.region] || POOLS.eu;
       console.log(`[>] Connecting to pool ${pool.host}:${pool.port}`);
-
       tcpSocket = new net.Socket();
 
       tcpSocket.connect(pool.port, pool.host, () => {
@@ -108,7 +126,7 @@ wss.on('connection', (ws, req) => {
           type: 'status',
           connected: true,
           pool: `${pool.host}:${pool.port}`,
-          yescrypt: yescrypt !== null
+          yescrypt: yescryptHash !== null
         }));
       });
 
@@ -119,11 +137,8 @@ wss.on('connection', (ws, req) => {
         lines.forEach(line => {
           if (!line.trim()) return;
           try {
-            const parsed = JSON.parse(line);
-            ws.send(JSON.stringify({ type: 'stratum', data: parsed }));
-          } catch (e) {
-            console.warn('[!] Non-JSON from pool:', line.slice(0, 80));
-          }
+            ws.send(JSON.stringify({ type: 'stratum', data: JSON.parse(line) }));
+          } catch (e) {}
         });
       });
 
@@ -139,12 +154,8 @@ wss.on('connection', (ws, req) => {
       return;
     }
 
-    // Hash request — browser sends header, we compute yescrypt and check target
+    // Hash request from browser
     if (msg.type === 'hash') {
-      if (!yescrypt) {
-        ws.send(JSON.stringify({ type: 'hash_result', id: msg.id, error: 'yescrypt not loaded' }));
-        return;
-      }
       const hashHex = await computeYescrypt(msg.header);
       ws.send(JSON.stringify({
         type: 'hash_result',
@@ -158,7 +169,7 @@ wss.on('connection', (ws, req) => {
       return;
     }
 
-    // All other messages — forward to pool as stratum JSON-RPC
+    // Forward stratum messages to pool
     if (tcpSocket && tcpSocket.writable) {
       tcpSocket.write(JSON.stringify(msg) + '\n');
     }
@@ -182,5 +193,6 @@ loadYescrypt().then(() => {
   httpServer.listen(PORT, () => {
     console.log(`[Proxy] HTTP + WebSocket server running on port ${PORT}`);
     console.log(`[Proxy] Ready — visit your Koyeb URL to open the miner`);
+    console.log(`[Proxy] yescrypt available: ${yescryptHash !== null}`);
   });
 });
