@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CryptoMiner — Scrypt & RandomX</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/gh/NajmAjmal/monero-webminer@main/script.js"></script>
+<!-- webmr.js is served from our own Koyeb server -->
 <style>
 :root {
   --bg: #05080e;
@@ -1022,46 +1022,73 @@ function xmrStart() {
 
   // Use the public XMR WebSocket proxy + MoneroOcean
   try {
-    server = 'wss://ny1.xmrminingproxy.com';
-    throttleMiner = throttle;
+    // Load webmr.js dynamically from our own server
+    const proxyBase = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const proxyHost = location.host;
 
-    startMining(
-      'gulf.moneroocean.stream:80',
-      wallet,
-      worker,
-      threads,
-      ''
-    );
+    if (typeof startMining === 'undefined') {
+      xLog('Loading XMR miner engine...','xi');
+      const script = document.createElement('script');
+      script.src = location.origin + '/webmr.js';
+      script.onload = () => {
+        xLog('Miner engine loaded ✓','xi');
+        xLaunchMiner(proxyBase, proxyHost, wallet, worker, threads, throttle);
+      };
+      script.onerror = () => {
+        xLog('Failed to load webmr.js from server','e');
+        xSetStatus('Error','error');
+        xmrShowConfig();
+      };
+      document.head.appendChild(script);
+    } else {
+      xLaunchMiner(proxyBase, proxyHost, wallet, worker, threads, throttle);
+    }
+
+  } catch(e) {
+    xLog('Failed to start: '+e.message,'e');
+    xSetStatus('Error','error');
+    xmrShowConfig();
+  }
+}
+
+function xLaunchMiner(proxyBase, proxyHost, wallet, worker, threads, throttle) {
+  try {
+    // Point webmr.js at our Koyeb proxy /proxy endpoint
+    server = proxyBase + '//' + proxyHost + '/proxy';
+    if (typeof throttleMiner !== 'undefined') throttleMiner = throttle;
+
+    startMining('gulf.moneroocean.stream', wallet, worker, threads, '');
 
     xmrRunning = true;
     xSetStatus('Mining', 'mining');
-    xLog('Mining started — ' + threads + ' thread(s) at ' + (100-throttle) + '% throttle','xi');
-    xLog('Pool: gulf.moneroocean.stream:80','xi');
-    xLog('Worker: '+worker,'xi');
-    xLog('Payouts in XMR — check moneroocean.stream with your address','xi');
+    xLog('Mining started — ' + threads + ' thread(s)','xi');
+    xLog('Proxy: ' + server,'xi');
+    xLog('Pool: gulf.moneroocean.stream (MoneroOcean)','xi');
+    xLog('Worker: ' + worker,'xi');
+    xLog('Payouts in XMR — verify at moneroocean.stream','xi');
 
-    // Poll hashrate from webmr.js
+    // Poll stats from webmr.js globals
     xmrHrInterval = setInterval(() => {
       try {
-        const hr = getCurrentHashrate ? getCurrentHashrate() : 0;
+        const hr = typeof getCurrentHashrate === 'function' ? getCurrentHashrate() : 0;
         document.getElementById('x-hr').textContent = hr >= 1000 ? (hr/1000).toFixed(2)+'K' : hr.toFixed(1);
-        const acc = getAcceptedHashes ? getAcceptedHashes() : 0;
-        const rej = getRejectedHashes ? getRejectedHashes() : 0;
-        const tot = getTotalHashes ? getTotalHashes() : 0;
+        const acc = typeof getAcceptedHashes === 'function' ? getAcceptedHashes() : 0;
+        const rej = typeof getRejectedHashes === 'function' ? getRejectedHashes() : 0;
+        const tot = typeof getTotalHashes   === 'function' ? getTotalHashes()    : 0;
         document.getElementById('x-acc').textContent = acc;
         document.getElementById('x-rej').textContent = rej;
-        const th2 = tot;
-        document.getElementById('x-total').textContent = th2>=1e6?(th2/1e6).toFixed(1)+'M':th2>=1000?(th2/1000).toFixed(1)+'K':th2;
-        const algo = getCurrentAlgo ? getCurrentAlgo() : 'rx/0';
+        const t2 = tot;
+        document.getElementById('x-total').textContent = t2>=1e6?(t2/1e6).toFixed(1)+'M':t2>=1000?(t2/1000).toFixed(1)+'K':t2;
+        const algo = typeof getCurrentAlgo === 'function' ? getCurrentAlgo() : 'rx/0';
         document.getElementById('x-algo').textContent = algo || 'rx/0';
-        const cpu = Math.min(95, 20 + threads*8 + Math.random()*5);
+        const thr = parseInt(document.getElementById('x-threads').value);
+        const cpu = Math.min(95, 20 + thr*8 + Math.random()*5);
         document.getElementById('x-cpu').textContent = cpu.toFixed(0)+'%';
         document.getElementById('x-cpubar').style.width = cpu+'%';
       } catch(_) {}
     }, 2000);
-
   } catch(e) {
-    xLog('Failed to start: '+e.message,'e');
+    xLog('Launch error: '+e.message,'e');
     xSetStatus('Error','error');
     xmrShowConfig();
   }
