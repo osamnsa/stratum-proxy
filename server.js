@@ -126,5 +126,5 @@ wss.on('connection', (ws, req) => {
 // ─── Start ────────────────────────────────────────────────────────────────────
 httpServer.listen(PORT, () => {
   console.log(`[Proxy] HTTP + WebSocket server running on port ${PORT}`);
-  console.log(`[Proxy] Visit http://localhost:${PORT} to open the miner`);
+  console.log(`[Proxy] Ready — visit your Koyeb URL to open the miner`);
 });
