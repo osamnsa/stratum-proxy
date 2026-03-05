@@ -346,39 +346,79 @@ function handleStratum(d){
 
 // ── Hash loop ──────────────────────────────────────────────────────────────────
 let loopActive=false, hashTick=0, lastTick=Date.now();
+let serverYescrypt=false; // set true when proxy confirms yescrypt loaded
+let pendingHashes=new Map(); // id -> resolve
+let hashReqId=0;
+
+// ── Server-side yescrypt hashing ───────────────────────────────────────────────
+// Instead of computing hashes in the browser (wrong algorithm),
+// we send block headers to the proxy which computes real yescrypt hashes.
+function requestHash(headerHex, jobId, extraNonce2, nTime, nonce){
+  return new Promise((resolve)=>{
+    const id = ++hashReqId;
+    pendingHashes.set(id, resolve);
+    ws.send(JSON.stringify({
+      type:'hash', id, header:headerHex,
+      jobId, extraNonce2, nTime, nonce
+    }));
+    // Timeout after 5s to avoid hanging
+    setTimeout(()=>{ if(pendingHashes.has(id)){ pendingHashes.delete(id); resolve(null); } }, 5000);
+  });
+}
+
+function handleHashResult(m){
+  const resolve = pendingHashes.get(m.id);
+  if(resolve){ pendingHashes.delete(m.id); resolve(m); }
+}
 
 async function startHashLoop(){ if(!loopActive){loopActive=true; await hashLoop();} }
 
 async function hashLoop(){
   if(!S.mining||!S.currentJob){loopActive=false;return;}
-  const threads=parseInt(document.getElementById('threads').value);
-  const batch=threads*40;
   const job=S.currentJob;
   const en2=b2h(crypto.getRandomValues(new Uint8Array(S.extraNonce2Size)));
   const cb=job.coinb1+S.extraNonce1+en2+job.coinb2;
+
   try {
+    // Build merkle root using SHA256 (standard for header construction)
     const cbBytes=h2b(cb);
     let cbH=await sha256(cbBytes); cbH=await sha256(cbH);
     let mr=cbH;
     for(const b of (job.branches||[])) mr=await sha256(await sha256(cat(mr,h2b(b))));
-    for(let i=0;i<batch&&S.mining;i++){
-      S.nonce=(S.nonce+1)>>>0;
-      const hdr=cat(
-        h2b((job.version||'00000001').padStart(8,'0')),
-        h2b((job.prevHash||'').padStart(64,'0')),
-        mr,
-        h2b((S.nTime||'00000000').padStart(8,'0')),
-        h2b((job.nbits||'').padStart(8,'0')),
-        u32le(S.nonce)
-      );
+
+    S.nonce=(S.nonce+1)>>>0;
+
+    // Build 80-byte block header
+    const hdr=cat(
+      h2b((job.version||'00000001').padStart(8,'0')),
+      h2b((job.prevHash||'').padStart(64,'0')),
+      mr,
+      h2b((S.nTime||'00000000').padStart(8,'0')),
+      h2b((job.nbits||'').padStart(8,'0')),
+      u32le(S.nonce)
+    );
+    const headerHex=b2h(hdr);
+    S.totalHashes++; hashTick++;
+
+    if(serverYescrypt){
+      // Send to proxy for real yescrypt hashing
+      const result = await requestHash(headerHex, job.jobId, en2, S.nTime, S.nonce);
+      if(result && result.hash){
+        const hashBytes = h2b(result.hash);
+        if(meetsTarget(hashBytes, S.difficulty||1)){
+          submitShare(job.jobId, en2, S.nTime, b2h(u32le(S.nonce)));
+          log('Share found! nonce:'+S.nonce.toString(16)+' hash:'+result.hash.slice(0,12)+'...','share');
+        }
+      }
+    } else {
+      // Fallback: SHA256 (won't pass pool validation but keeps stats updating)
       const h=await sha256(await sha256(hdr));
-      S.totalHashes++; hashTick++;
       if(meetsTarget(h,S.difficulty||1)){
-        submitShare(job.jobId,en2,S.nTime,b2h(u32le(S.nonce)));
-        log('Share found! nonce:'+S.nonce.toString(16),'share');
+        log('SHA256 candidate (yescrypt not ready): '+S.nonce.toString(16),'warn');
       }
     }
   } catch(_){}
+
   const now=Date.now();
   if(now-lastTick>=1000){ S.hashrate=hashTick/((now-lastTick)/1000); hashTick=0; lastTick=now; updateStats(); }
   setTimeout(hashLoop,0);
@@ -403,9 +443,10 @@ function connect(url){
   ws.onmessage=(e)=>{
     let m; try{m=JSON.parse(e.data);}catch{return;}
     if(m.type==='status'){
-      if(m.connected){ S.connected=true; S.mining=true; log('Pool connected: '+m.pool,'info'); setStatus('Connected','connected',m.pool); subscribe(); }
+      if(m.connected){ S.connected=true; S.mining=true; serverYescrypt=m.yescrypt||false; log('Pool connected: '+m.pool+(serverYescrypt?' [yescrypt ✓]':' [yescrypt ✗ — SHA256 fallback]'),'info'); setStatus('Connected','connected',m.pool); subscribe(); }
       else            { S.connected=false; S.mining=false; log('Pool disconnected','warn'); setStatus('Disconnected','error'); retry(url); }
     } else if(m.type==='stratum'){ handleStratum(m.data); }
+    else if(m.type==='hash_result'){ handleHashResult(m); }
     else if(m.type==='error'){ log('Proxy error: '+m.message,'error'); setStatus('Error','error'); }
   };
   ws.onerror=()=>{ log('WebSocket failed — is the proxy running?','error'); setStatus('Failed','error'); };
